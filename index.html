@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飲み会ルーレット</title>
+<style>
+  body { text-align: center; font-family: sans-serif; background: #f8f8f8; }
+  canvas { background: white; border-radius: 50%; margin-top: 20px; }
+  button { font-size: 18px; padding: 10px 20px; margin: 10px; border-radius: 8px; border: none; cursor: pointer; }
+  #startBtn { background: #28a745; color: white; }
+  #stopBtn { background: #dc3545; color: white; }
+  #result { font-size: 20px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<h1>飲み会ルーレット</h1>
+<canvas id="wheel" width="300" height="300"></canvas><br>
+<button id="startBtn">スタート</button>
+<button id="stopBtn" disabled>ストップ</button>
+<div id="result"></div>
+
+<audio id="drumSound" src="drum.mp3" preload="auto"></audio>
+<audio id="fanfareSound" src="fanfare.mp3" preload="auto"></audio>
+
+<script>
+const questions = [
+  "出身地は？","好きな食べ物は？","最近ハマっていることは？","休日の過ごし方は？","好きなスポーツは？",
+  "子どもの頃の夢は？","好きな映画は？","今行きたい場所は？","好きな音楽は？","最近の嬉しかったことは？",
+  "学生時代の部活は？","得意料理は？","好きな飲み物は？","よく行くお店は？","最近読んだ本は？",
+  "初めて買ったCDは？","旅行で一番良かった場所は？","挑戦したいことは？","好きな季節は？","座右の銘は？"
+];
+
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const resultEl = document.getElementById('result');
+const drumSound = document.getElementById('drumSound');
+const fanfareSound = document.getElementById('fanfareSound');
+
+let angle = 0;
+let spinning = false;
+let spinSpeed = 0;
+let segCount = questions.length;
+let segAngle = 2 * Math.PI / segCount;
+
+function drawWheel() {
+  const radius = canvas.width / 2;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < segCount; i++) {
+    const startAngle = segAngle * i + angle;
+    ctx.beginPath();
+    ctx.moveTo(radius, radius);
+    ctx.arc(radius, radius, radius, startAngle, startAngle + segAngle);
+    ctx.fillStyle = i % 2 === 0 ? '#ffd966' : '#f6b26b';
+    ctx.fill();
+    ctx.save();
+    ctx.translate(radius, radius);
+    ctx.rotate(startAngle + segAngle / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#000';
+    const dynamicFontSize = Math.min(14, segAngle * radius * 0.4);
+    ctx.font = `${dynamicFontSize}px sans-serif`;
+    ctx.fillText(questions[i], radius - 30, 5);
+    ctx.restore();
+  }
+  // 矢印
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath();
+  ctx.moveTo(radius - 10, 0);
+  ctx.lineTo(radius + 10, 0);
+  ctx.lineTo(radius, 20);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function rotateWheel() {
+  if (!spinning) return;
+  angle += spinSpeed;
+  spinSpeed *= 0.98;
+  if (spinSpeed < 0.002) {
+    spinning = false;
+    stopBtn.disabled = true;
+    startBtn.disabled = false;
+    drumSound.pause();
+    drumSound.currentTime = 0;
+    fanfareSound.play();
+    showResult();
+  } else {
+    requestAnimationFrame(rotateWheel);
+  }
+  drawWheel();
+}
+
+function showResult() {
+  const normalizedAngle = (angle + Math.PI / 2) % (2 * Math.PI);
+  const index = Math.floor((segCount - (normalizedAngle / segAngle)) % segCount);
+  resultEl.textContent = `選ばれたのは：${questions[index]}`;
+}
+
+startBtn.addEventListener('click', () => {
+  if (spinning) return;
+  spinSpeed = Math.random() * 0.3 + 0.25;
+  spinning = true;
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+  drumSound.loop = true;
+  drumSound.play();
+  rotateWheel();
+});
+
+stopBtn.addEventListener('click', () => {
+  spinSpeed *= 0.95;
+});
+drawWheel();
+</script>
+</body>
+</html>
