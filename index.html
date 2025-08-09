@@ -1,119 +1,279 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飲み会ルーレット</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>スロットマシン型 質問アプリ</title>
 <style>
-  body { text-align: center; font-family: sans-serif; background: #f8f8f8; }
-  canvas { background: white; border-radius: 50%; margin-top: 20px; }
-  button { font-size: 18px; padding: 10px 20px; margin: 10px; border-radius: 8px; border: none; cursor: pointer; }
-  #startBtn { background: #28a745; color: white; }
-  #stopBtn { background: #dc3545; color: white; }
-  #result { font-size: 20px; margin-top: 20px; }
+  :root{
+    --bg:#f4f4f4;
+    --card:#fff;
+    --accent:#e53935;
+    --line:#ffeb3b;
+  }
+  html,body{height:100%;}
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: var(--bg);
+    color:#111;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+    box-sizing:border-box;
+  }
+
+  h1{margin:8px 0 16px;font-size:20px;text-align:center}
+
+  /* スロットの外枠 */
+  .container {
+    position: relative;
+    width: min(420px, 94vw);
+    height: 300px;
+    overflow: hidden;
+    border-radius:12px;
+    background: var(--card);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    border: 3px solid #333;
+  }
+
+  /* 回転リスト本体 */
+  .slot {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    top: 0;
+    will-change: transform;
+  }
+
+  .item {
+    height: 60px;
+    line-height: 60px;
+    font-size: 20px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 決定ライン */
+  .line {
+    position: absolute;
+    top: calc(50% - 30px); /* 中央に高さ60pxのライン */
+    width: 100%;
+    height: 60px;
+    pointer-events: none;
+  }
+  .line::before, .line::after {
+    content: "";
+    position: absolute;
+    left:0; right:0; height:3px;
+    background: var(--accent);
+  }
+  .line::before { top: 0; }
+  .line::after  { bottom:0; }
+
+  /* ボタン群 */
+  .controls {
+    margin-top: 18px;
+    display:flex;
+    gap:12px;
+    align-items:center;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  button {
+    font-size:18px;
+    padding:10px 18px;
+    border-radius:10px;
+    border: none;
+    cursor:pointer;
+    background:#1976d2;
+    color:white;
+  }
+  button.secondary{
+    background:#e53935;
+  }
+  button:disabled{opacity:0.6;cursor:not-allowed}
+
+  /* モバイル向けの余白調整 */
+  @media (max-width:420px){
+    .item{font-size:18px;height:56px;line-height:56px}
+    .container{height:280px}
+  }
+
 </style>
 </head>
 <body>
-<h1>飲み会ルーレット</h1>
-<canvas id="wheel" width="300" height="300"></canvas><br>
-<button id="startBtn">スタート</button>
-<button id="stopBtn" disabled>ストップ</button>
-<div id="result"></div>
 
+<h1>スロット質問マシン</h1>
+
+<div class="container" aria-hidden="false">
+  <div class="slot" id="slot"></div>
+  <div class="line" aria-hidden="true"></div>
+</div>
+
+<div class="controls">
+  <button id="startBtn">スタート</button>
+  <button id="stopBtn" class="secondary" disabled>ストップ</button>
+</div>
+
+<!-- 音声ファイル（同フォルダに置く） -->
 <audio id="drumSound" src="drum.mp3" preload="auto"></audio>
 <audio id="fanfareSound" src="fanfare.mp3" preload="auto"></audio>
 
 <script>
+/* --- 質問（飲み会・同郷向け 20個） --- */
 const questions = [
-  "出身地は？","好きな食べ物は？","最近ハマっていることは？","休日の過ごし方は？","好きなスポーツは？",
-  "子どもの頃の夢は？","好きな映画は？","今行きたい場所は？","好きな音楽は？","最近の嬉しかったことは？",
-  "学生時代の部活は？","得意料理は？","好きな飲み物は？","よく行くお店は？","最近読んだ本は？",
-  "初めて買ったCDは？","旅行で一番良かった場所は？","挑戦したいことは？","好きな季節は？","座右の銘は？"
+  "出身地のおすすめ観光スポットは？",
+  "小さい頃よく行った場所は？",
+  "地元で有名な食べ物は？",
+  "地元の方言で好きな言葉は？",
+  "地元の有名人といえば誰？",
+  "地元で一番好きな季節は？",
+  "子どもの頃によく遊んだ場所は？",
+  "地元で行きつけだったお店は？",
+  "地元の隠れた名所は？",
+  "地元にまつわるちょっとした自慢は？",
+  "地元の祭りやイベントの思い出は？",
+  "地元の学校あるあるを一つ",
+  "地元のラーメンorうどん事情は？",
+  "地元で一番印象に残っている景色は？",
+  "子どもの頃好きだった給食メニューは？",
+  "地元の天気や気候の特徴は？",
+  "地元の友達とよくした遊びは？",
+  "地元で定番の手土産は？",
+  "地元の方言で自己紹介してみて",
+  "地元に戻ったら必ず行く場所は？"
 ];
 
-const canvas = document.getElementById('wheel');
-const ctx = canvas.getContext('2d');
+/* --- 要素取得 --- */
+const slot = document.getElementById('slot');
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
-const resultEl = document.getElementById('result');
-const drumSound = document.getElementById('drumSound');
-const fanfareSound = document.getElementById('fanfareSound');
+const drum = document.getElementById('drumSound');
+const fanfare = document.getElementById('fanfareSound');
 
-let angle = 0;
-let spinning = false;
-let spinSpeed = 0;
-let segCount = questions.length;
-let segAngle = 2 * Math.PI / segCount;
+let ticker = null;      // setInterval ハンドラ
+let position = 0;       // px
+let speed = 0;          // px per tick
+const itemHeight = 60;  // CSSと一致させる
+const visibleCount = 5; // 見えている個数（実装上の目安）
 
-function drawWheel() {
-  const radius = canvas.width / 2;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < segCount; i++) {
-    const startAngle = segAngle * i + angle;
-    ctx.beginPath();
-    ctx.moveTo(radius, radius);
-    ctx.arc(radius, radius, radius, startAngle, startAngle + segAngle);
-    ctx.fillStyle = i % 2 === 0 ? '#ffd966' : '#f6b26b';
-    ctx.fill();
-    ctx.save();
-    ctx.translate(radius, radius);
-    ctx.rotate(startAngle + segAngle / 2);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#000';
-    const dynamicFontSize = Math.min(14, segAngle * radius * 0.4);
-    ctx.font = `${dynamicFontSize}px sans-serif`;
-    ctx.fillText(questions[i], radius - 30, 5);
-    ctx.restore();
+/* --- スロットリストを作る（リストを2回繰り返してループ） --- */
+function renderSlot(){
+  slot.innerHTML = "";
+  const arr = questions.concat(questions); // ループのために2回繰り返す
+  for(let i=0;i<arr.length;i++){
+    const d = document.createElement('div');
+    d.className = 'item';
+    d.textContent = arr[i];
+    slot.appendChild(d);
   }
-  // 矢印
-  ctx.fillStyle = '#e74c3c';
-  ctx.beginPath();
-  ctx.moveTo(radius - 10, 0);
-  ctx.lineTo(radius + 10, 0);
-  ctx.lineTo(radius, 20);
-  ctx.closePath();
-  ctx.fill();
+  // 初期位置を0に
+  position = 0;
+  slot.style.transform = `translateY(${-position}px)`;
 }
+renderSlot();
 
-function rotateWheel() {
-  if (!spinning) return;
-  angle += spinSpeed;
-  spinSpeed *= 0.98;
-  if (spinSpeed < 0.002) {
-    spinning = false;
-    stopBtn.disabled = true;
-    startBtn.disabled = false;
-    drumSound.pause();
-    drumSound.currentTime = 0;
-    fanfareSound.play();
-    showResult();
-  } else {
-    requestAnimationFrame(rotateWheel);
-  }
-  drawWheel();
-}
+/* --- スタート処理 --- */
+function startSpin(){
+  if(ticker) return;
+  speed = 30 + Math.random()*20; // 初速（px/tick）
+  // モバイルブラウザではタップで再生トリガーが必要なのでここで再生
+  drum.currentTime = 0;
+  drum.loop = true;
+  drum.play().catch(()=>{/* 自動再生拒否は無視 */});
 
-function showResult() {
-  const normalizedAngle = (angle + Math.PI / 2) % (2 * Math.PI);
-  const index = Math.floor((segCount - (normalizedAngle / segAngle)) % segCount);
-  resultEl.textContent = `選ばれたのは：${questions[index]}`;
-}
-
-startBtn.addEventListener('click', () => {
-  if (spinning) return;
-  spinSpeed = Math.random() * 0.3 + 0.25;
-  spinning = true;
   startBtn.disabled = true;
   stopBtn.disabled = false;
-  drumSound.loop = true;
-  drumSound.play();
-  rotateWheel();
-});
 
-stopBtn.addEventListener('click', () => {
-  spinSpeed *= 0.95;
+  ticker = setInterval(()=>{
+    position += speed;
+    // ループ処理（2回分の高さ）
+    const full = questions.length * itemHeight;
+    if(position >= full) position = position - full;
+    slot.style.transform = `translateY(${-position}px)`;
+  }, 50); // 20fps 相当
+}
+
+/* --- ストップ処理（止めるときは減衰→確定） --- */
+function stopSpin(){
+  if(!ticker) return;
+  stopBtn.disabled = true;
+  // 徐々に速度を落とすルーチン（0になると停止）
+  const dec = setInterval(()=>{
+    speed *= 0.92;
+    if(speed < 1.5){
+      // 完全に止める直前に位置を中央ラインにスナップ
+      clearInterval(dec);
+      clearInterval(ticker);
+      ticker = null;
+      // 中央ラインのオフセット（container高さの中央）
+      const container = document.querySelector('.container');
+      const centerOffset = Math.round((container.clientHeight / 2) - (itemHeight / 2));
+      // 現在のpositionを元に中央に来る最も近いアイテムのindexを計算
+      const full = questions.length * itemHeight;
+      // position は [0, full)
+      // compute index of item at y = position + centerOffset
+      let raw = position + centerOffset;
+      raw = ((raw % full) + full) % full; // normalize
+      const idx = Math.floor(raw / itemHeight) % questions.length;
+      // スナップ位置を計算してアニメーションで移動
+      const targetPosition = idx * itemHeight;
+      // animate from current position to targetPosition
+      const startPos = position;
+      // choose shortest path (consider wrap)
+      let diff = targetPosition - startPos;
+      // allow adjusting by ±full to get smaller abs
+      if(Math.abs(diff + full) < Math.abs(diff)) diff += full;
+      if(Math.abs(diff - full) < Math.abs(diff)) diff -= full;
+      const duration = 400; // ms
+      const frames = Math.round(duration / 16);
+      let frame = 0;
+      const step = () => {
+        frame++;
+        const t = frame / frames;
+        // ease out cubic
+        const eased = 1 - Math.pow(1 - t, 3);
+        position = startPos + diff * eased;
+        const normalized = ((position % full) + full) % full;
+        slot.style.transform = `translateY(${-normalized}px)`;
+        if(frame < frames){
+          requestAnimationFrame(step);
+        } else {
+          // 停止完了
+          drum.pause();
+          drum.currentTime = 0;
+          fanfare.currentTime = 0;
+          fanfare.play().catch(()=>{});
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          // 確定インデックス（中央）
+          const raw2 = ((position + centerOffset) % full + full) % full;
+          const finalIdx = Math.floor(raw2 / itemHeight) % questions.length;
+          // 表示（alertの代わりにvisibleなUIでも可）
+          setTimeout(()=>{ alert("選ばれた質問:\n" + questions[finalIdx]); }, 120);
+        }
+      };
+      requestAnimationFrame(step);
+    }
+  }, 80);
+}
+
+/* --- ボタンイベント --- */
+startBtn.addEventListener('click', startSpin);
+stopBtn.addEventListener('click', stopSpin);
+
+/* --- 初期レンダリングで高さが変わることに対応 --- */
+window.addEventListener('resize', () => {
+  // nothing heavy needed — calculation uses container.clientHeight dynamically when stopping
 });
-drawWheel();
 </script>
+
 </body>
 </html>
